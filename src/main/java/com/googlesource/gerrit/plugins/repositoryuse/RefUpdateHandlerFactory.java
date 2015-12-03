@@ -14,6 +14,6 @@
 
 package com.googlesource.gerrit.plugins.repositoryuse;
 
-public interface RefUpdateHandler {
-  void run();
+public interface RefUpdateHandlerFactory {
+  RefUpdateHandler create(RefUpdate update);
 }

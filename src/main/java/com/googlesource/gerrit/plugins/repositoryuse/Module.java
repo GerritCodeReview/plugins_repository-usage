@@ -19,15 +19,19 @@ import com.google.gerrit.extensions.registration.DynamicSet;
 import com.google.inject.AbstractModule;
 import com.google.inject.Provides;
 import com.google.inject.Singleton;
+import com.google.inject.assistedinject.FactoryModuleBuilder;
 
 public class Module extends AbstractModule {
   @Override
   protected void configure() {
     DynamicSet.bind(binder(), GitReferenceUpdatedListener.class)
-        .to(RefUpdateHandler.class);
+        .to(EventHandler.class);
     requestStaticInjection(Config.class);
     requestStaticInjection(Ref.Table.class);
     requestStaticInjection(Usage.Table.class);
+    install(new FactoryModuleBuilder()
+        .implement(RefUpdateHandler.class, RefUpdateHandlerImpl.class)
+        .build(RefUpdateHandlerFactory.class));
     bind(LifecycleListener.class).annotatedWith(UniqueAnnotations.create())
         .to(SQLDriver.class);
   }
