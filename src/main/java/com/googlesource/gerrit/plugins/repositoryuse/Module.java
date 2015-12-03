@@ -15,11 +15,16 @@
 package com.googlesource.gerrit.plugins.repositoryuse;
 
 import com.google.gerrit.extensions.events.GitReferenceUpdatedListener;
+import com.google.gerrit.extensions.events.LifecycleListener;
 import com.google.gerrit.extensions.registration.DynamicSet;
 import com.google.inject.AbstractModule;
 import com.google.inject.Provides;
+import com.google.inject.Scopes;
 import com.google.inject.Singleton;
 import com.google.inject.assistedinject.FactoryModuleBuilder;
+import com.google.inject.internal.UniqueAnnotations;
+
+import java.util.concurrent.ScheduledThreadPoolExecutor;
 
 public class Module extends AbstractModule {
   @Override
@@ -32,6 +37,12 @@ public class Module extends AbstractModule {
     install(new FactoryModuleBuilder()
         .implement(RefUpdateHandler.class, RefUpdateHandlerImpl.class)
         .build(RefUpdateHandlerFactory.class));
+    install(
+        new FactoryModuleBuilder().implement(ScanTask.class, ScanTaskImpl.class)
+            .build(ScanTaskFactory.class));
+    bind(ScanningQueue.class).in(Scopes.SINGLETON);
+    bind(LifecycleListener.class).annotatedWith(UniqueAnnotations.create())
+        .to(ScanningQueue.class);
     bind(LifecycleListener.class).annotatedWith(UniqueAnnotations.create())
         .to(SQLDriver.class);
   }
@@ -40,5 +51,11 @@ public class Module extends AbstractModule {
   @Singleton
   SQLDriver provideSqlDriver() {
     return new SQLDriver();
+  }
+
+  @Provides
+  @ScanningPool
+  ScheduledThreadPoolExecutor provideScanningPool(ScanningQueue queue) {
+    return queue.getPool();
   }
 }
