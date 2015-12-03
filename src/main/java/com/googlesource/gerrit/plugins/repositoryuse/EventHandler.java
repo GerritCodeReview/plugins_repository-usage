@@ -14,6 +14,21 @@
 
 package com.googlesource.gerrit.plugins.repositoryuse;
 
-public interface RefUpdateHandler {
-  void run();
+import com.google.gerrit.extensions.events.GitReferenceUpdatedListener;
+
+import com.google.inject.Inject;
+
+public class EventHandler implements GitReferenceUpdatedListener {
+  RefUpdateHandlerFactory refUpdateHandlerFactory;
+
+  @Inject
+  public EventHandler(RefUpdateHandlerFactory refUpdateHandlerFactory) {
+    this.refUpdateHandlerFactory = refUpdateHandlerFactory;
+  }
+
+  @Override
+  public void onGitReferenceUpdated(Event event) {
+    RefUpdate update = new RefUpdate(event);
+    refUpdateHandlerFactory.create(update).run();
+  }
 }
