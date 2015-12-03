@@ -23,6 +23,7 @@ gerrit_plugin(
   manifest_entries = [
     'Gerrit-PluginName: repository-usage',
     'Gerrit-Module: com.googlesource.gerrit.plugins.repositoryuse.Module',
+    'Gerrit-SshModule: com.googlesource.gerrit.plugins.repositoryuse.SshModule',
   ],
   deps = DEPS,
   provided_deps = PROVIDED_DEPS,
