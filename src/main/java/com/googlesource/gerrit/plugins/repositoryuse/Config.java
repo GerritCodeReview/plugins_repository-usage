@@ -50,7 +50,7 @@ public class Config {
     parseManifests = pc.getBoolean("parseManifests", true);
     databaseType = pc.getEnum("databaseType", Database.H2);
     database = pc.getString("database",
-        sitePaths.site_path.resolve("db/UsageDB").toString());
+        sitePaths.site_path.toPath().resolve("db/UsageDB").toString());
     databaseHost = pc.getString("databaseHost", "");
     databaseUser = pc.getString("databaseUser", "");
     databasePassword = pc.getString("databasePassword", "");

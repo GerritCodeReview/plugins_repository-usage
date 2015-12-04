@@ -41,8 +41,8 @@ public class RefUpdate {
     this.refName = event.getRefName();
     this.oldObjectId = event.getOldObjectId();
     this.newObjectId = event.getNewObjectId();
-    this.isCreate = event.isCreate();
-    this.isDelete = event.isDelete();
+    this.isCreate = oldObjectId.equals(ObjectId.zeroId().name());
+    this.isDelete = newObjectId.equals(ObjectId.zeroId().name());
   }
 
   public String getProjectName() {

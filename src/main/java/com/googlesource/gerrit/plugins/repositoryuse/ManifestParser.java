@@ -104,7 +104,7 @@ public class ManifestParser {
       }
 
       if (uri != null && revision != null) {
-        resolvedProjects.putIfAbsent(uri, revision);
+        resolvedProjects.put(uri, revision);
       } else {
         log.warn("Invalid project description in manifest");
       }
@@ -113,7 +113,7 @@ public class ManifestParser {
   }
 
   public void addRemote(String name, String fetch) {
-    remotes.putIfAbsent(name, fetch);
+    remotes.put(name, fetch);
   }
 
   public void addDefault(String remote, String revision, String branch,

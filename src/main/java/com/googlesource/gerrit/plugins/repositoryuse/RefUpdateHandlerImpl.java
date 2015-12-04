@@ -219,7 +219,7 @@ public class RefUpdateHandlerImpl implements RefUpdateHandler {
         sw.setTree(commit.getTree());
         sw.setRootTree(commit.getTree());
         while (sw.next()) {
-          submodules.putIfAbsent(
+          submodules.put(
               normalizePath(project.getName(), sw.getModulesUrl(), false),
               sw.getObjectId().name());
         }
