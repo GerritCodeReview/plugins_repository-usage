@@ -113,6 +113,9 @@ public class ManifestParser {
   }
 
   public void addRemote(String name, String fetch) {
+    if (fetch != null && fetch.endsWith("/")) {
+      fetch = fetch.substring(0, fetch.length()-1);
+    }
     remotes.put(name, fetch);
   }
 
@@ -155,6 +158,15 @@ public class ManifestParser {
       this.remote = remote;
       this.name = name;
       this.revision = revision;
+      if (this.name != null && this.name.endsWith("/")) {
+        this.name = this.name.substring(0, this.name.length()-1);
+      }
+      if (this.name != null && this.name.endsWith(".git")) {
+        this.name = this.name.substring(0, this.name.length()-4);
+      }
+      if (this.name != null && this.name.startsWith("/")) {
+        this.name = this.name.substring(1);
+      }
     }
 
     public String getRemote() {
