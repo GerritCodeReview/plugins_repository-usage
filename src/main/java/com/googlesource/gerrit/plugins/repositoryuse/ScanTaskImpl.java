@@ -100,7 +100,12 @@ public class ScanTaskImpl implements ScanTask {
         RefUpdate rescan = new RefUpdate(project,
             branches.get(currentBranch).getName(), ObjectId.zeroId().getName(),
             branches.get(currentBranch).getObjectId().name());
-        refUpdateHandlerFactory.create(rescan).run();
+        try {
+          refUpdateHandlerFactory.create(rescan).run();
+        } catch (Exception e) {
+          log.error(String.format("Error updating %s branch %s: %s", project,
+              branch, e.getMessage()), e);
+        }
       }
     } else {
       if (branch.startsWith(Constants.R_HEADS)) {
@@ -111,7 +116,12 @@ public class ScanTaskImpl implements ScanTask {
         RefUpdate rescan = new RefUpdate(project,
             branches.get(branch).getName(), ObjectId.zeroId().getName(),
             branches.get(branch).getObjectId().name());
-        refUpdateHandlerFactory.create(rescan).run();
+        try {
+          refUpdateHandlerFactory.create(rescan).run();
+        } catch (Exception e) {
+          log.error(String.format("Error updating %s branch %s: %s", project,
+              branch, e.getMessage()), e);
+        }
       } else {
         log.warn(String.format("Branch %s does not exist; skipping", branch));
       }

@@ -29,6 +29,7 @@ import org.eclipse.jgit.diff.DiffFormatter;
 import org.eclipse.jgit.diff.RawTextComparator;
 import org.eclipse.jgit.errors.ConfigInvalidException;
 import org.eclipse.jgit.errors.RepositoryNotFoundException;
+import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectLoader;
@@ -39,6 +40,8 @@ import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.submodule.SubmoduleWalk;
 import org.eclipse.jgit.treewalk.TreeWalk;
+import org.eclipse.jgit.treewalk.filter.PathFilter;
+import org.eclipse.jgit.util.RawParseUtils;
 import org.eclipse.jgit.util.io.DisabledOutputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -87,7 +90,7 @@ public class RefUpdateHandlerImpl implements RefUpdateHandler {
     if (event.isDelete() && event.getRefName().startsWith(Constants.R_HEADS)
         || event.getRefName().startsWith(Constants.R_TAGS)) {
       // Ref was deleted... clean up any references
-      Ref ref = Ref.fetchByRef(event.getProjectName(), event.getRefName());
+      Ref ref = Ref.fetchByRef(getCanonicalProject(event.getProjectName()), event.getRefName());
       if (ref != null) {
         ref.delete();
       }
@@ -97,11 +100,11 @@ public class RefUpdateHandlerImpl implements RefUpdateHandler {
             event.getRefName());
       }
     } else if (event.getRefName().startsWith(Constants.R_TAGS)) {
-      Ref updatedRef = new Ref(event.getProjectName(), event.getRefName(),
+      Ref updatedRef = new Ref(getCanonicalProject(event.getProjectName()), event.getRefName(),
           event.getNewObjectId());
       updatedRef.save();
     } else if (event.getRefName().startsWith(Constants.R_HEADS)) {
-      Ref updatedRef = new Ref(event.getProjectName(), event.getRefName(),
+      Ref updatedRef = new Ref(getCanonicalProject(event.getProjectName()), event.getRefName(),
           event.getNewObjectId());
       updatedRef.save();
       Project.NameKey nameKey = new Project.NameKey(event.getProjectName());
@@ -155,7 +158,10 @@ public class RefUpdateHandlerImpl implements RefUpdateHandler {
                   String.format("%s:%s", event.getProjectName(), path),
                   event.getRefName(), projects);
             } else {
-              log.warn(String.format("%s is too large, skipping manifest parse",
+              log.warn(String.format(
+                  "project: %s, branch: %s, file: %s is too large, "
+                      + "skipping manifest parse",
+                  event.getProjectName(), event.getRefName(),
                   tw.getPathString()));
             }
           }
@@ -213,19 +219,77 @@ public class RefUpdateHandlerImpl implements RefUpdateHandler {
     HashMap<String, String> submodules = new HashMap<>();
     try (Repository repo = repoManager.openRepository(project.getNameKey())) {
       try (RevWalk walk = new RevWalk(repo);
-          SubmoduleWalk sw = new SubmoduleWalk(repo)) {
+          SubmoduleWalk sw = new SubmoduleWalk(repo);
+          TreeWalk cw = new TreeWalk(repo)) {
+        org.eclipse.jgit.lib.Config modulesConfig = null;
+
+        // TODO: Nasty hack! Work around JGit bug where modules aren't
+        // found if path is not the same as the name in the config!
+        // Also, BlobBasedConfig (which is used by SubmoduleWalk) doesn't
+        // handle UTF-8 BOMs, so we need to do some massaging.
         RevCommit commit =
             walk.parseCommit(repo.resolve(event.getNewObjectId()));
+        cw.addTree(commit.getTree());
+        cw.setRecursive(false);
+        PathFilter filter = PathFilter.create(Constants.DOT_GIT_MODULES);
+        cw.setFilter(filter);
+        while (cw.next()) {
+          if (filter.isDone(cw)) {
+            ObjectReader reader = repo.newObjectReader();
+            String decoded = "";
+            try {
+              ObjectLoader loader =
+                  reader.open(cw.getObjectId(0), Constants.OBJ_BLOB);
+              byte[] configBytes = loader.getCachedBytes(Integer.MAX_VALUE);
+              if (configBytes.length >= 3 && configBytes[0] == (byte) 0xEF
+                  && configBytes[1] == (byte) 0xBB
+                  && configBytes[2] == (byte) 0xBF) {
+                decoded = RawParseUtils.decode(RawParseUtils.UTF8_CHARSET,
+                    configBytes, 3, configBytes.length);
+              } else {
+                decoded = RawParseUtils.decode(configBytes);
+              }
+            } catch (IOException e) {
+              log.error(
+                  String.format("Unable to load .gitmodules in %s branch %s",
+                      event.getProjectName(), event.getRefName()),
+                  e);
+            }
+            modulesConfig = new org.eclipse.jgit.lib.Config();
+            modulesConfig.fromText(decoded);
+          }
+        }
         sw.setTree(commit.getTree());
         sw.setRootTree(commit.getTree());
+        sw.setModulesConfig(modulesConfig);
         while (sw.next()) {
-          submodules.put(
-              normalizePath(project.getName(), sw.getModulesUrl(), false),
-              sw.getObjectId().name());
+          String modulesUrl = sw.getModulesUrl();
+          if (modulesUrl == null && modulesConfig != null) {
+            for (String key : modulesConfig
+                .getSubsections(ConfigConstants.CONFIG_SUBMODULE_SECTION)) {
+              if (sw.getPath().equals(modulesConfig.getString(
+                  ConfigConstants.CONFIG_SUBMODULE_SECTION, key,
+                  ConfigConstants.CONFIG_KEY_PATH))) {
+                modulesUrl = modulesConfig.getString(
+                    ConfigConstants.CONFIG_SUBMODULE_SECTION, key,
+                    ConfigConstants.CONFIG_KEY_URL);
+                break;
+              }
+            }
+          }
+          if (modulesUrl != null) {
+            submodules.put(normalizePath(project.getName(), modulesUrl, false),
+                sw.getObjectId().name());
+          } else {
+            log.warn(String.format(
+                "invalid .gitmodules in %s %s configuration: missing url for %s",
+                project.getName(), event.getRefName(), sw.getPath()));
+          }
         }
       } catch (ConfigInvalidException e) {
-        log.warn("Invalid .gitmodules configuration while parsing "
-            + project.getName());
+        log.warn(String.format(
+            "Invalid .gitmodules configuration while parsing %s branch %s",
+            project.getName(), event.getRefName()), e);
       }
     }
     return submodules;
