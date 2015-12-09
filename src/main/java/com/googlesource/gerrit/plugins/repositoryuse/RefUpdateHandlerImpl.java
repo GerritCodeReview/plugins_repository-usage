@@ -319,6 +319,12 @@ public class RefUpdateHandlerImpl implements RefUpdateHandler {
   }
 
   private String getCanonicalProject(String project) {
+    if (project.startsWith("/")) {
+      project = project.substring(1);
+    }
+    if (project.endsWith(".git")) {
+      project = project.substring(0, project.length() - 4);
+    }
     String canonicalProject =
         String.format("https://%s/%s", serverName, project);
     try {
