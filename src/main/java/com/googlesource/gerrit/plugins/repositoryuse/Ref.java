@@ -72,12 +72,12 @@ public class Ref {
 
   public void save() {
     lastUpdated = new Date();
+    log.debug(String.format("Saving Ref: %s, %s, %s", project, ref, commit));
     table.insertOrUpdate(this);
-    log.info(String.format("Saving Ref: %s, %s, %s", project, ref, commit));
   }
 
   public void delete() {
-    log.info(String.format("Deleting Ref: %s, %s", project, ref));
+    log.debug(String.format("Deleting Ref: %s, %s", project, ref));
     table.delete(this);
   }
 
