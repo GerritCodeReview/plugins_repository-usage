@@ -14,23 +14,18 @@
 
 package com.googlesource.gerrit.plugins.repositoryuse;
 
-import com.google.gerrit.reviewdb.client.Project;
-import com.google.gerrit.server.CurrentUser;
-import com.google.gerrit.server.git.GitRepositoryManager;
-import com.google.gerrit.server.project.NoSuchProjectException;
-import com.google.gerrit.server.project.ProjectControl;
-import com.google.gerrit.server.project.ProjectResource;
+import com.google.gerrit.extensions.api.projects.BranchInfo;
+import com.google.gerrit.extensions.api.projects.Projects;
+import com.google.gerrit.extensions.restapi.RestApiException;
 import com.google.inject.assistedinject.Assisted;
 import com.google.inject.assistedinject.AssistedInject;
 
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.Repository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.util.Map;
+import java.util.List;
 
 public class ScanTaskImpl implements ScanTask {
   private static final Logger log =
@@ -39,37 +34,30 @@ public class ScanTaskImpl implements ScanTask {
   private String project;
   private String branch;
   private RefUpdateHandlerFactory refUpdateHandlerFactory;
-  private ProjectControl.GenericFactory projectControl;
-  private CurrentUser user;
-  private GitRepositoryManager repoManager;
+  private Projects projects;
 
   @AssistedInject
   public ScanTaskImpl(@Assisted String project,
       RefUpdateHandlerFactory refUpdateHandlerFactory,
-      ProjectControl.GenericFactory p, CurrentUser user,
-      GitRepositoryManager repoManager) {
-    init(project, null, refUpdateHandlerFactory, p, user, repoManager);
+      Projects projects) {
+    init(project, null, refUpdateHandlerFactory, projects);
   }
 
   @AssistedInject
   public ScanTaskImpl(@Assisted("project") String project,
       @Assisted("branch") String branch,
       RefUpdateHandlerFactory refUpdateHandlerFactory,
-      ProjectControl.GenericFactory p, CurrentUser user,
-      GitRepositoryManager repoManager) {
-    init(project, branch, refUpdateHandlerFactory, p, user, repoManager);
+      Projects projects) {
+    init(project, branch, refUpdateHandlerFactory, projects);
   }
 
   private void init(String project, String branch,
       RefUpdateHandlerFactory refUpdateHandlerFactory,
-      ProjectControl.GenericFactory p, CurrentUser user,
-      GitRepositoryManager repoManager) {
+      Projects projects) {
     this.project = project;
     this.branch = branch;
     this.refUpdateHandlerFactory = refUpdateHandlerFactory;
-    this.projectControl = p;
-    this.user = user;
-    this.repoManager = repoManager;
+    this.projects = projects;
   }
 
   @Override
@@ -83,47 +71,26 @@ public class ScanTaskImpl implements ScanTask {
 
   @Override
   public void run() {
-    Map<String, org.eclipse.jgit.lib.Ref> branches = null;
-    Project.NameKey nameKey = new Project.NameKey(project);
+    List<BranchInfo> branches = null;
     try {
-      ProjectResource project =
-          new ProjectResource(projectControl.controlFor(nameKey, user));
-      try (Repository repo = repoManager.openRepository(project.getNameKey())) {
-        branches = repo.getRefDatabase().getRefs(Constants.R_HEADS);
-      }
-    } catch (NoSuchProjectException | IOException e) {
+      branches = projects.name(project).branches().get();
+    } catch (RestApiException e) {
       log.error(e.getMessage(), e);
     }
-    if (branch == null) {
-      for (String currentBranch : branches.keySet()) {
-        // Create with a "new" base commit to rescan entire branch
-        RefUpdate rescan = new RefUpdate(project,
-            branches.get(currentBranch).getName(), ObjectId.zeroId().getName(),
-            branches.get(currentBranch).getObjectId().name());
+    if (!branch.startsWith(Constants.R_HEADS)) {
+      branch = Constants.R_HEADS.length() + branch;
+    }
+    for (BranchInfo currentBranch : branches) {
+      // Create with a "new" base commit to rescan entire branch
+      if (branch == null || branch == currentBranch.ref) {
+        RefUpdate rescan = new RefUpdate(project, currentBranch.ref,
+            ObjectId.zeroId().getName(), currentBranch.revision);
         try {
           refUpdateHandlerFactory.create(rescan).run();
         } catch (Exception e) {
           log.error(String.format("Error updating %s branch %s: %s", project,
               branch, e.getMessage()), e);
         }
-      }
-    } else {
-      if (branch.startsWith(Constants.R_HEADS)) {
-        branch = branch.substring(Constants.R_HEADS.length());
-      }
-
-      if (branches.containsKey(branch)) {
-        RefUpdate rescan = new RefUpdate(project,
-            branches.get(branch).getName(), ObjectId.zeroId().getName(),
-            branches.get(branch).getObjectId().name());
-        try {
-          refUpdateHandlerFactory.create(rescan).run();
-        } catch (Exception e) {
-          log.error(String.format("Error updating %s branch %s: %s", project,
-              branch, e.getMessage()), e);
-        }
-      } else {
-        log.warn(String.format("Branch %s does not exist; skipping", branch));
       }
     }
   }
