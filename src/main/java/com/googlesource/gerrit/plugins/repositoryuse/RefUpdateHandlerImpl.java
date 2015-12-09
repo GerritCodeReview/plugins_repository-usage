@@ -324,6 +324,15 @@ public class RefUpdateHandlerImpl implements RefUpdateHandler {
     String originalProject =
         isManifest ? project.substring(0, project.lastIndexOf(":")) : project;
 
+    // Strip trailing slashes and .git suffix
+    if (destination.endsWith("/")) {
+      destination = destination.substring(0, destination.length()-1);
+    }
+
+    if (destination.endsWith(".git")) {
+      destination = destination.substring(0, destination.length()-4);
+    }
+
     // Handle relative and absolute paths on the same server
     if (destination.startsWith("/")) {
       if (serverName != null) {
