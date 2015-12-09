@@ -96,15 +96,15 @@ public class Usage {
 
   public void save() {
     lastUpdated = new Date();
-    table.insertOrUpdate(this);
-    log.info(String.format("Saving Usage: %s, %s, %s, %s", project, branch,
+    log.debug(String.format("Saving Usage: %s, %s, %s, %s", project, branch,
         destination, ref));
+    table.insertOrUpdate(this);
   }
 
   public void delete() {
-    table.delete(this);
-    log.info(String.format("Deleting Usage: %s, %s, %s", project, branch,
+    log.debug(String.format("Deleting Usage: %s, %s, %s", project, branch,
         destination));
+    table.delete(this);
   }
 
   public static List<Usage> fetchByProject(String project) {
@@ -120,8 +120,8 @@ public class Usage {
   }
 
   public static void deleteByBranch(String project, String branch) {
+    log.debug(String.format("Deleting all uses: %s, %s", project, branch));
     table.deleteByBranch(project, branch);
-    log.info(String.format("Deleting all uses: %s, %s", project, branch));
   }
 
   static class Table {
