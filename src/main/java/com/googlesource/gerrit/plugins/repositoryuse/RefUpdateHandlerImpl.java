@@ -81,7 +81,8 @@ public class RefUpdateHandlerImpl implements RefUpdateHandler {
     if (event.isDelete() && event.getRefName().startsWith(Constants.R_HEADS)
         || event.getRefName().startsWith(Constants.R_TAGS)) {
       // Ref was deleted... clean up any references
-      Ref ref = Ref.fetchByRef(getCanonicalProject(event.getProjectName()), event.getRefName());
+      Ref ref = Ref.fetchByRef(getCanonicalProject(event.getProjectName()),
+          event.getRefName());
       if (ref != null) {
         ref.delete();
       }
@@ -91,12 +92,12 @@ public class RefUpdateHandlerImpl implements RefUpdateHandler {
             event.getRefName());
       }
     } else if (event.getRefName().startsWith(Constants.R_TAGS)) {
-      Ref updatedRef = new Ref(getCanonicalProject(event.getProjectName()), event.getRefName(),
-          event.getNewObjectId());
+      Ref updatedRef = new Ref(getCanonicalProject(event.getProjectName()),
+          event.getRefName(), event.getNewObjectId());
       updatedRef.save();
     } else if (event.getRefName().startsWith(Constants.R_HEADS)) {
-      Ref updatedRef = new Ref(getCanonicalProject(event.getProjectName()), event.getRefName(),
-          event.getNewObjectId());
+      Ref updatedRef = new Ref(getCanonicalProject(event.getProjectName()),
+          event.getRefName(), event.getNewObjectId());
       updatedRef.save();
       Project.NameKey nameKey = new Project.NameKey(event.getProjectName());
       try {
@@ -256,9 +257,10 @@ public class RefUpdateHandlerImpl implements RefUpdateHandler {
           if (modulesUrl == null && modulesConfig != null) {
             for (String key : modulesConfig
                 .getSubsections(ConfigConstants.CONFIG_SUBMODULE_SECTION)) {
-              if (sw.getPath().equals(modulesConfig.getString(
-                  ConfigConstants.CONFIG_SUBMODULE_SECTION, key,
-                  ConfigConstants.CONFIG_KEY_PATH))) {
+              if (sw.getPath()
+                  .equals(modulesConfig.getString(
+                      ConfigConstants.CONFIG_SUBMODULE_SECTION, key,
+                      ConfigConstants.CONFIG_KEY_PATH))) {
                 modulesUrl = modulesConfig.getString(
                     ConfigConstants.CONFIG_SUBMODULE_SECTION, key,
                     ConfigConstants.CONFIG_KEY_URL);
@@ -267,7 +269,8 @@ public class RefUpdateHandlerImpl implements RefUpdateHandler {
             }
           }
           if (modulesUrl != null) {
-            submodules.put(normalizePath(event.getProjectName(), modulesUrl, false),
+            submodules.put(
+                normalizePath(event.getProjectName(), modulesUrl, false),
                 sw.getObjectId().name());
           } else {
             log.warn(String.format(
@@ -324,7 +327,21 @@ public class RefUpdateHandlerImpl implements RefUpdateHandler {
     String originalProject =
         isManifest ? project.substring(0, project.lastIndexOf(":")) : project;
 
+    // Strip trailing slashes and .git suffix
+    if (destination.endsWith("/")) {
+      destination = destination.substring(0, destination.length() - 1);
+    }
+
+    if (destination.endsWith(".git")) {
+      destination = destination.substring(0, destination.length() - 4);
+    }
+
     // Handle relative and absolute paths on the same server
+    if (destination.startsWith("//")) {
+      // UNC path; let this pass through unaltered.
+      // This should be rather uncommon, though.
+      return destination;
+    }
     if (destination.startsWith("/")) {
       if (serverName != null) {
         destination = serverName + destination;
@@ -350,7 +367,9 @@ public class RefUpdateHandlerImpl implements RefUpdateHandler {
       // Replace the protocol with a known scheme, to avoid angering URL
       destination = destination.replaceFirst("^[^:]+://", "");
       URL url = new URL("https://" + destination);
-      destination = url.getHost() + url.getPath();
+      destination = url.getHost();
+      Path path = Paths.get(url.getPath()).normalize();
+      destination += path.toString();
     } catch (MalformedURLException e) {
       log.warn("Could not parse destination as URL: " + destination);
     }
