@@ -16,6 +16,7 @@ package com.googlesource.gerrit.plugins.repositoryuse;
 
 import com.google.gerrit.extensions.api.projects.BranchInfo;
 import com.google.gerrit.extensions.api.projects.Projects;
+import com.google.gerrit.extensions.api.projects.TagInfo;
 import com.google.gerrit.extensions.restapi.RestApiException;
 import com.google.inject.assistedinject.Assisted;
 import com.google.inject.assistedinject.AssistedInject;
@@ -71,27 +72,45 @@ public class ScanTaskImpl implements ScanTask {
 
   @Override
   public void run() {
-    List<BranchInfo> branches = null;
     try {
-      branches = projects.name(project).branches().get();
+      List<BranchInfo> branches = projects.name(project).branches().get();
+
+      if (branch != null && !branch.startsWith(Constants.R_HEADS)) {
+        branch = Constants.R_HEADS + branch;
+      }
+
+      for (BranchInfo currentBranch : branches) {
+        // Create with a "new" base commit to rescan entire branch
+        if (branch == null || branch == currentBranch.ref) {
+          RefUpdate rescan = new RefUpdate(project, currentBranch.ref,
+              ObjectId.zeroId().getName(), currentBranch.revision);
+          try {
+            refUpdateHandlerFactory.create(rescan).run();
+          } catch (Exception e) {
+            log.error(String.format("Error updating %s branch %s: %s", project,
+                currentBranch, e.getMessage()), e);
+          }
+        }
+      }
     } catch (RestApiException e) {
       log.error(e.getMessage(), e);
     }
-    if (branch != null && !branch.startsWith(Constants.R_HEADS)) {
-      branch = Constants.R_HEADS + branch;
-    }
-    for (BranchInfo currentBranch : branches) {
-      // Create with a "new" base commit to rescan entire branch
-      if (branch == null || branch == currentBranch.ref) {
-        RefUpdate rescan = new RefUpdate(project, currentBranch.ref,
-            ObjectId.zeroId().getName(), currentBranch.revision);
+
+    try {
+      List<TagInfo> tags = projects.name(project).tags().get();
+
+      for (TagInfo currentTag : tags) {
+        RefUpdate rescan = new RefUpdate(project, currentTag.ref,
+            ObjectId.zeroId().getName(), currentTag.revision);
         try {
           refUpdateHandlerFactory.create(rescan).run();
         } catch (Exception e) {
           log.error(String.format("Error updating %s branch %s: %s", project,
-              branch, e.getMessage()), e);
+              currentTag, e.getMessage()), e);
         }
       }
+    } catch (RestApiException e) {
+      log.error(e.getMessage(), e);
     }
   }
 
