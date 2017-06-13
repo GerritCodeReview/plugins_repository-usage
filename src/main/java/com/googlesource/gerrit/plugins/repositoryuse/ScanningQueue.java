@@ -37,7 +37,6 @@ public class ScanningQueue implements LifecycleListener {
   @Override
   public void stop() {
     if (threadPool != null) {
-      threadPool.unregisterWorkQueue();
       threadPool = null;
     }
   }
