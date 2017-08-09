@@ -24,6 +24,7 @@ import com.google.inject.Singleton;
 import com.google.inject.assistedinject.FactoryModuleBuilder;
 import com.google.inject.internal.UniqueAnnotations;
 
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 
 public class Module extends AbstractModule {
@@ -55,7 +56,7 @@ public class Module extends AbstractModule {
 
   @Provides
   @ScanningPool
-  ScheduledThreadPoolExecutor provideScanningPool(ScanningQueue queue) {
+  ScheduledExecutorService provideScanningPool(ScanningQueue queue) {
     return queue.getPool();
   }
 }
