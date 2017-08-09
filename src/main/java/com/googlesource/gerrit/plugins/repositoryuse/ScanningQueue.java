@@ -18,11 +18,12 @@ import com.google.gerrit.extensions.events.LifecycleListener;
 import com.google.gerrit.server.git.WorkQueue;
 import com.google.inject.Inject;
 
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 
 public class ScanningQueue implements LifecycleListener {
   private final WorkQueue queue;
-  private WorkQueue.Executor threadPool;
+  private ScheduledExecutorService threadPool;
 
   @Inject
   public ScanningQueue(WorkQueue queue) {
@@ -36,14 +37,11 @@ public class ScanningQueue implements LifecycleListener {
 
   @Override
   public void stop() {
-    if (threadPool != null) {
-      threadPool.unregisterWorkQueue();
-      threadPool = null;
-    }
+    threadPool = null;
   }
 
-  public ScheduledThreadPoolExecutor getPool() {
+  public ScheduledExecutorService getPool() {
     return threadPool;
-  }
+   }
 
 }
